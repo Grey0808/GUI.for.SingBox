@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { parse } from 'yaml'
 import { readSubscriptionMetadata } from '@/utils/subscriptionMetadata'
+import { parseXraySubscription } from '@/utils/xraySubscription'
 
 import { ReadFile, WriteFile, Requests } from '@/bridge'
 import { DefaultSubscribeScript, SubscribesFilePath } from '@/constant/app'
@@ -126,7 +127,11 @@ export const useSubscribesStore = defineStore('subscribes', () => {
       body = b
     }
 
-    if (isValidSubJson(body)) {
+    const xray = s.type === 'Manual' ? null : parseXraySubscription(body)
+    if (xray) {
+      const configs = JSON.parse(body)
+      proxies = (Array.isArray(configs) ? configs : [configs]).flatMap((config) => config.outbounds)
+    } else if (isValidSubJson(body)) {
       proxies = JSON.parse(body).outbounds
     } else if (isValidSubYAML(body)) {
       proxies = parse(body).proxies
@@ -141,6 +146,10 @@ export const useSubscribesStore = defineStore('subscribes', () => {
     const pluginStore = usePluginsStore()
 
     proxies = await pluginStore.onSubscribeTrigger(proxies, s)
+
+    if (xray && proxies.some((proxy) => typeof proxy.type !== 'string' || typeof proxy.tag !== 'string')) {
+      throw new Error('Xray outbounds require conversion before they can be imported')
+    }
 
     if (proxies.some((proxy) => proxy.name && !proxy.tag) || proxies[0]?.base64) {
       throw 'You need to install the [节点转换] plugin first'
