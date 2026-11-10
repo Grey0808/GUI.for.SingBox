@@ -442,7 +442,7 @@ export const generateConfig = async (
     options = { enableStableConfigCompat: options }
   }
   const appSettings = useAppSettingsStore()
-  const isMainBranch = appSettings.app.kernel.branch === Branch.Main
+  const isMainBranch = appSettings.app.kernel.branch !== Branch.Alpha
 
   const {
     enableStableConfigCompat = isMainBranch,
