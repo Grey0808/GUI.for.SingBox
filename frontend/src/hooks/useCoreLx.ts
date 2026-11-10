@@ -22,6 +22,7 @@ import {
   sha256FromSums,
   windowsAmd64AssetName,
 } from '@/utils/coreReleases'
+import { selectLX } from '@/utils/coreSelection'
 
 type Release = {
   tag_name: string
@@ -162,8 +163,7 @@ export function useCoreLx() {
       throw new Error('Stop the core before changing its version')
     const path = lxCorePath(selectedInstalled.value)
     if (!(await FileExists(path))) throw new Error('Selected version is not installed')
-    settings.app.kernel.lxVersion = selectedInstalled.value
-    settings.app.kernel.branch = Branch.Lx
+    selectLX(settings.app.kernel, selectedInstalled.value)
   }
 
   function cancel() {

@@ -89,6 +89,7 @@ declare namespace App {
       realMemoryUsage: boolean
       branch: 'main' | 'alpha' | 'lx'
       lxVersion?: string
+      previousKernelSelection?: { branch: 'main' | 'alpha' | 'lx'; lxVersion?: string }
       profile: string
       autoClose: boolean
       unAvailable: boolean

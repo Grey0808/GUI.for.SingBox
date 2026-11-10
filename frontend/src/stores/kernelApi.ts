@@ -25,6 +25,7 @@ import { DefaultInboundMixed } from '@/constant/profile'
 import { Branch } from '@/enums/app'
 import { Inbound, RulesetType, TunStack } from '@/enums/kernel'
 import { lxCorePath } from '@/utils/coreReleases'
+import { restorePreviousCore } from '@/utils/coreSelection'
 import {
   useAppSettingsStore,
   useProfilesStore,
@@ -389,6 +390,12 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
       }
       const pid = await runCoreProcess(isAlpha, corePath)
       pid && (await onCoreStarted(pid))
+      delete appSettingsStore.app.kernel.previousKernelSelection
+    } catch (error) {
+      if (!running.value && restorePreviousCore(appSettingsStore.app.kernel)) {
+        throw new Error(`${error} (previous core selection restored)`)
+      }
+      throw error
     } finally {
       starting.value = false
     }
