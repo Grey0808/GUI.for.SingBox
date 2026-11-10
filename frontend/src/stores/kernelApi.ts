@@ -14,7 +14,7 @@ import {
   destroyWebsocket,
   probeApiAvailability,
 } from '@/api/kernel'
-import { ProcessInfo, KillProcess, ExecBackground, ReadFile, RemoveFile } from '@/bridge'
+import { ProcessInfo, KillProcess, Exec, ExecBackground, ReadFile, RemoveFile } from '@/bridge'
 import {
   CoreConfigFilePath,
   CoreLogFilePath,
@@ -24,6 +24,7 @@ import {
 import { DefaultInboundMixed } from '@/constant/profile'
 import { Branch } from '@/enums/app'
 import { Inbound, RulesetType, TunStack } from '@/enums/kernel'
+import { lxCorePath } from '@/utils/coreReleases'
 import {
   useAppSettingsStore,
   useProfilesStore,
@@ -271,10 +272,10 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
     }
   }
 
-  const runCoreProcess = async (isAlpha: boolean) => {
+  const runCoreProcess = async (isAlpha: boolean, corePath: string) => {
     let stopped = false
     const pid = await ExecBackground(
-      CoreWorkingDirectory + '/' + getKernelFileName(isAlpha),
+      corePath,
       getKernelRuntimeArgs(isAlpha),
       undefined,
       async (end) => {
@@ -369,7 +370,24 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
         pluginsStore.onBeforeCoreStartTrigger(config, profile),
       )
       const isAlpha = branch === Branch.Alpha
-      const pid = await runCoreProcess(isAlpha)
+      const corePath = branch === Branch.Lx
+        ? lxCorePath(appSettingsStore.app.kernel.lxVersion || '')
+        : CoreWorkingDirectory + '/' + getKernelFileName(isAlpha)
+      const args = getKernelRuntimeArgs(isAlpha)
+      const runIndex = args.indexOf('run')
+      if (runIndex === -1) {
+        throw new Error('Cannot validate core configuration: launch arguments do not contain run')
+      }
+      const checkArgs = [...args]
+      checkArgs[runIndex] = 'check'
+      try {
+        await Exec(corePath, checkArgs, {
+          Env: getKernelRuntimeEnv(isAlpha),
+        })
+      } catch (error) {
+        throw new Error(`Core configuration check failed: ${error}`)
+      }
+      const pid = await runCoreProcess(isAlpha, corePath)
       pid && (await onCoreStarted(pid))
     } finally {
       starting.value = false

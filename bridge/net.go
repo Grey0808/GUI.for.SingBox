@@ -281,6 +281,9 @@ func (a *App) Download(method string, url string, path string, headers map[strin
 		return HTTPResult{false, 500, nil, err.Error()}
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return HTTPResult{false, resp.StatusCode, resp.Header, fmt.Sprintf("download failed: HTTP %s", resp.Status)}
+	}
 
 	path = resolvePath(path)
 
@@ -306,9 +309,11 @@ func (a *App) Download(method string, url string, path string, headers map[strin
 	_, err = io.Copy(writer, reader)
 	if err != nil {
 		file.Close()
+		_ = os.Remove(path)
 		return HTTPResult{false, 500, nil, err.Error()}
 	}
 	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
 		return HTTPResult{false, 500, nil, err.Error()}
 	}
 

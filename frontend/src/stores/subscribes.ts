@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { parse } from 'yaml'
+import { readSubscriptionMetadata } from '@/utils/subscriptionMetadata'
 
 import { ReadFile, WriteFile, Requests } from '@/bridge'
 import { DefaultSubscribeScript, SubscribesFilePath } from '@/constant/app'
@@ -84,6 +85,7 @@ export const useSubscribesStore = defineStore('subscribes', () => {
 
   const _doUpdateSub = async (s: App.Subscription, options: Partial<App.Subscription> = {}) => {
     const userInfo: Recordable = {}
+    let metadata: ReturnType<typeof readSubscriptionMetadata> = {}
     let body = ''
     let proxies: Record<string, any>[] = []
 
@@ -114,6 +116,7 @@ export const useSubscribesStore = defineStore('subscribes', () => {
         },
       })
       Object.assign(h, s.header.response, options.header?.response)
+      metadata = readSubscriptionMetadata(h)
       if (h['Subscription-Userinfo']) {
         ;(h['Subscription-Userinfo'] as string).split(/\s*;\s*/).forEach((part) => {
           const [key, value] = part.split('=') as [string, string]
@@ -187,6 +190,7 @@ export const useSubscribesStore = defineStore('subscribes', () => {
     const { proxies: _proxies, subscription } = await fn(proxies, s)
 
     Object.assign(s, subscription)
+    if (Object.keys(metadata).length) s.metadata = { ...s.metadata, ...metadata }
     s.proxies = _proxies.map(({ tag, type }) => {
       // Keep the original ID value of the proxy unchanged
       const id = s.proxies.find((v) => v.tag === tag)?.id || sampleID()

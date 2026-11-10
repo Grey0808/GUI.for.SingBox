@@ -85,7 +85,8 @@ declare namespace App {
     }
     kernel: {
       realMemoryUsage: boolean
-      branch: 'main' | 'alpha'
+      branch: 'main' | 'alpha' | 'lx'
+      lxVersion?: string
       profile: string
       autoClose: boolean
       unAvailable: boolean
@@ -193,6 +194,12 @@ declare namespace App {
   interface Subscription {
     id: string
     name: string
+    metadata?: {
+      profileTitle?: string | string[]
+      profileUpdateInterval?: string | string[]
+      supportUrl?: string | string[]
+      announce?: string | string[]
+    }
     upload: number
     download: number
     total: number

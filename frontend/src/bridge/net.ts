@@ -150,27 +150,20 @@ const requestWithProgress = (fnName: 'Download' | 'Upload') => {
       EventsOn(progressEvent, progress!)
     }
 
-    const {
-      flag,
-      status,
-      headers: respHeaders,
-      body: respBody,
-    } = await Bridge[fnName](
-      method,
-      transformRequestUrl(url),
-      path,
-      _headers,
-      progressEvent,
-      _options,
-    )
-
-    if (progressEvent) {
-      EventsOff(progressEvent)
+    try {
+      const { flag, status, headers: respHeaders, body: respBody } = await Bridge[fnName](
+        method,
+        transformRequestUrl(url),
+        path,
+        _headers,
+        progressEvent,
+        _options,
+      )
+      if (!flag) throw respBody
+      return transformResponse(status, respHeaders, respBody)
+    } finally {
+      if (progressEvent) EventsOff(progressEvent)
     }
-
-    if (!flag) throw respBody
-
-    return transformResponse(status, respHeaders, respBody)
   }
 }
 

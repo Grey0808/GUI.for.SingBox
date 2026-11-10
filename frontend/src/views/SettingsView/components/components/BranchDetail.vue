@@ -24,6 +24,7 @@ const {
   grantable,
   rollbackable,
   versionDetail,
+  capabilities,
   localVersion,
   localVersionLoading,
   remoteVersion,
@@ -109,6 +110,9 @@ const handleClearCoreCache = async () => {
   <Card>
     <div v-if="versionDetail" class="text-12 pt-8 break-all line-clamp-2">
       {{ versionDetail }}
+    </div>
+    <div v-if="localVersion" class="text-12 pt-8">
+      XHTTP: {{ capabilities.xhttp === null ? t('settings.kernel.capabilityUnknown') : capabilities.xhttp ? t('settings.kernel.capabilityAvailable') : t('settings.kernel.capabilityUnavailable') }}
     </div>
     <div class="flex items-center min-h-38">
       <Tag

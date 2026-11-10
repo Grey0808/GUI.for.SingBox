@@ -273,11 +273,14 @@ export const handleChangeMode = async (mode: 'direct' | 'global' | 'rule') => {
 
   if (mode === kernelApiStore.config.mode) return
 
-  kernelApiStore.updateConfig('mode', mode)
-
-  const { connections } = await getConnections()
-  const promises = (connections || []).map((v) => deleteConnection(v.id))
-  await Promise.all(promises)
+  try {
+    await kernelApiStore.updateConfig('mode', mode)
+    if (kernelApiStore.config.mode.toLowerCase() !== mode.toLowerCase()) {
+      throw new Error(`Core did not apply mode: ${mode}`)
+    }
+  } catch (error: any) {
+    message.error(error?.message || String(error))
+  }
 }
 
 export const addToRuleSet = async (

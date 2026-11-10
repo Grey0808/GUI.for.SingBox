@@ -46,6 +46,7 @@ export enum Color {
 export enum Branch {
   Main = 'main',
   Alpha = 'alpha',
+  Lx = 'lx',
 }
 
 export enum RequestProxyMode {

@@ -271,38 +271,43 @@ func (a *App) UnzipZIPFile(path string, output string) FlagResult {
 	for _, f := range archive.File {
 		filePath, ok := archiveEntryPath(outputPath, f.Name)
 		if !ok {
-			continue
+			return FlagResult{false, "Invalid archive path: " + f.Name}
 		}
 
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(filePath, os.ModePerm)
+			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+				return FlagResult{false, err.Error()}
+			}
 			continue
+		}
+		if !f.Mode().IsRegular() {
+			return FlagResult{false, "Unsupported archive entry: " + f.Name}
 		}
 
 		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-			continue
+			return FlagResult{false, err.Error()}
 		}
 
 		fileInArchive, err := f.Open()
 		if err != nil {
-			continue
+			return FlagResult{false, err.Error()}
 		}
 
 		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			fileInArchive.Close()
-			continue
+			return FlagResult{false, err.Error()}
 		}
 
 		if _, err := io.Copy(dstFile, fileInArchive); err != nil {
 			fileInArchive.Close()
 			dstFile.Close()
-			continue
+			return FlagResult{false, err.Error()}
 		}
 
 		fileInArchive.Close()
 		if err := dstFile.Close(); err != nil {
-			continue
+			return FlagResult{false, err.Error()}
 		}
 	}
 
@@ -340,30 +345,35 @@ func (a *App) UnzipTarGZFile(path string, output string) FlagResult {
 
 		filePath, ok := archiveEntryPath(outputPath, header.Name)
 		if !ok {
-			continue
+			return FlagResult{false, "Invalid archive path: " + header.Name}
 		}
 
 		if header.Typeflag == tar.TypeDir {
-			os.MkdirAll(filePath, os.ModePerm)
+			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+				return FlagResult{false, err.Error()}
+			}
 			continue
+		}
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {
+			return FlagResult{false, "Unsupported archive entry: " + header.Name}
 		}
 
 		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-			continue
+			return FlagResult{false, err.Error()}
 		}
 
 		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, header.FileInfo().Mode())
 		if err != nil {
-			continue
+			return FlagResult{false, err.Error()}
 		}
 
 		if _, err := io.Copy(dstFile, tarReader); err != nil {
 			dstFile.Close()
-			continue
+			return FlagResult{false, err.Error()}
 		}
 
 		if err := dstFile.Close(); err != nil {
-			continue
+			return FlagResult{false, err.Error()}
 		}
 	}
 

@@ -66,9 +66,16 @@ export class Request {
       return null as T
     }
 
-    if ([504, 401, 503].includes(res.status)) {
-      const { message } = await res.json()
-      throw message
+    if (!res.ok) {
+      const body = await res.text()
+      let detail = body
+      try {
+        const json = JSON.parse(body)
+        detail = json.message || json.error || body
+      } catch {
+        // Some controllers return a plain-text error.
+      }
+      throw new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ''}`)
     }
 
     if (this.responseType === ResponseType.TEXT) {
