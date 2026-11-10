@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, toRefs } from 'vue'
+import { ref, toRefs, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { OutboundOptions, BuiltInOutbound } from '@/constant/kernel'
 import { Outbound } from '@/enums/kernel'
-import { useSubscribesStore } from '@/stores'
+import { useSubscribesStore, useCoreCapabilitiesStore } from '@/stores'
 
 interface Props {
   outbound: App.Outbound
@@ -16,9 +16,10 @@ const { outbound } = toRefs(props)
 
 const { t } = useI18n()
 const subscribesStore = useSubscribesStore()
+const capabilities = useCoreCapabilitiesStore()
 const expandedSet = ref<Set<string>>(new Set(['Built-in', 'Subscription']))
 
-const outboundGroups = [
+const outboundGroups = computed(() => [
   {
     id: 'Built-in',
     name: 'kernel.outbounds.builtIn',
@@ -37,9 +38,10 @@ const outboundGroups = [
     })),
   },
   ...subscribesStore.subscribes.map(({ id, name, proxies }) => ({ id, name, proxies })),
-]
+])
 
 const handleAddProxy = (groupID: string, proxyID: string, proxyName: string) => {
+  if (capabilities.reason(groupID, proxyName)) return
   if (groupID === 'Built-in' && proxyID === outbound.value.id) return
 
   const idx = outbound.value.outbounds.findIndex((item) => item.id === proxyID)
@@ -145,11 +147,16 @@ const isExpanded = (key: string) => expandedSet.value.has(key)
             v-for="proxy in group.proxies"
             :key="proxy.id"
             :type="isInuse(proxy.id) ? 'link' : 'text'"
+            :disabled="Boolean(capabilities.reason(group.id, proxy.tag))"
+            :title="capabilities.reason(group.id, proxy.tag)"
             @click="handleAddProxy(group.id, proxy.id, proxy.tag)"
           >
             {{ proxy.tag }}
             <br />
             {{ proxy.type }}
+            <span v-if="capabilities.reason(group.id, proxy.tag)">{{
+              capabilities.reason(group.id, proxy.tag)
+            }}</span>
           </Button>
         </div>
       </div>

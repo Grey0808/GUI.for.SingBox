@@ -14,7 +14,12 @@ import {
 } from '@/constant/app'
 import { ControllerCloseMode } from '@/enums/app'
 import { useBool } from '@/hooks'
-import { useAppSettingsStore, useKernelApiStore, useProfilesStore } from '@/stores'
+import {
+  useAppSettingsStore,
+  useKernelApiStore,
+  useProfilesStore,
+  useCoreCapabilitiesStore,
+} from '@/stores'
 import {
   ignoredError,
   sleep,
@@ -36,6 +41,7 @@ const [showMoreSettings, toggleMoreSettings] = useBool(false)
 const appSettings = useAppSettingsStore()
 const kernelApiStore = useKernelApiStore()
 const profilesStore = useProfilesStore()
+const capabilities = useCoreCapabilitiesStore()
 
 const groups = computed(() => {
   const { proxies } = kernelApiStore
@@ -323,9 +329,14 @@ onActivated(() => {
             :key="proxy.name"
             :title="proxy.name"
             :selected="proxy.name === group.now"
+            :class="{ 'opacity-50 pointer-events-none': capabilities.reasonByTag(proxy.name) }"
+            :aria-disabled="Boolean(capabilities.reasonByTag(proxy.name))"
             class="cursor-pointer"
             @click="useProxyWithCatchError(group, proxy)"
           >
+            <div v-if="capabilities.reasonByTag(proxy.name)" class="text-12">
+              {{ capabilities.reasonByTag(proxy.name) }}
+            </div>
             <Button
               :style="{ color: delayColor(proxy.delay) }"
               :loading="isLoading(proxy.name)"
@@ -345,9 +356,13 @@ onActivated(() => {
           <div
             v-for="proxy in group.all"
             :key="proxy.name"
-            v-tips.fast="proxy.name"
+            v-tips.fast="capabilities.reasonByTag(proxy.name) || proxy.name"
             :style="{ background: delayColor(proxy.delay) }"
-            :class="proxy.name === group.now ? 'rounded-full shadow' : ''"
+            :class="[
+              proxy.name === group.now ? 'rounded-full shadow' : '',
+              { 'opacity-50 pointer-events-none': capabilities.reasonByTag(proxy.name) },
+            ]"
+            :aria-disabled="Boolean(capabilities.reasonByTag(proxy.name))"
             class="w-12 h-12 rounded-4 flex items-center justify-center"
             @click="useProxyWithCatchError(group, proxy)"
           >

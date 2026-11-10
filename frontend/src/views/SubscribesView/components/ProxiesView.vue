@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import { ClipboardSetText, ReadFile, WriteFile } from '@/bridge'
 import { DraggableOptions } from '@/constant/app'
-import { useSubscribesStore } from '@/stores'
+import { useSubscribesStore, useCoreCapabilitiesStore } from '@/stores'
 import { buildSmartRegExp, deepClone, ignoredError, message, modal, sampleID } from '@/utils'
 
 import Button from '@/components/Button/index.vue'
@@ -22,6 +22,7 @@ const keywords = ref('')
 const proxyType = ref('')
 const allFieldsProxies = ref<any[]>([])
 const sub = ref(deepClone(props.sub))
+const capabilities = useCoreCapabilitiesStore()
 
 const filteredProxyTypeOptions = computed(() => {
   const proxyProtocols = sub.value.proxies.reduce((p, c) => {
@@ -264,9 +265,13 @@ defineExpose({ modalSlots })
           :key="proxy.tag"
           v-menu="menus.map((v) => ({ ...v, handler: () => v.handler?.(proxy) }))"
           :title="proxy.tag"
+          :class="{ 'opacity-50': capabilities.reason(sub.id, proxy.tag) }"
         >
           <div class="text-12">
             {{ proxy.type }}
+            <div v-if="capabilities.reason(sub.id, proxy.tag)">
+              {{ capabilities.reason(sub.id, proxy.tag) }}
+            </div>
           </div>
         </Card>
       </div>

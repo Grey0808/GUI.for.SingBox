@@ -22,6 +22,7 @@ import {
   useKernelApiStore,
   usePluginsStore,
   useRulesetsStore,
+  useCoreCapabilitiesStore,
 } from '@/stores'
 import {
   formatProxyHost,
@@ -259,6 +260,8 @@ export const DisableAutoStart = async () => {
 
 // Others
 export const handleUseProxy = async (group: any, proxy: any) => {
+  const unavailable = useCoreCapabilitiesStore().reasonByTag(proxy.name)
+  if (unavailable) throw new Error(unavailable)
   if (group.type !== 'Selector' || group.now === proxy.name) return
   const promises: Promise<null>[] = []
   const appSettings = useAppSettingsStore()

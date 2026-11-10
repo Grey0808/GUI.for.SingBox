@@ -159,7 +159,7 @@ export function useCoreLx() {
   }
 
   async function activate() {
-    if (kernel.running || kernel.starting || kernel.restarting)
+    if (kernel.running || kernel.starting || kernel.stopping || kernel.restarting)
       throw new Error('Stop the core before changing its version')
     const path = lxCorePath(selectedInstalled.value)
     if (!(await FileExists(path))) throw new Error('Selected version is not installed')
