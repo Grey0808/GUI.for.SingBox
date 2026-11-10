@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { parse } from 'yaml'
-import { readSubscriptionMetadata } from '@/utils/subscriptionMetadata'
-import { parseXraySubscription } from '@/utils/xraySubscription'
 
 import { ReadFile, WriteFile, Requests } from '@/bridge'
 import { DefaultSubscribeScript, SubscribesFilePath } from '@/constant/app'
@@ -23,6 +21,8 @@ import {
   GetRequestProxy,
   migrateSubscribes,
 } from '@/utils'
+import { readSubscriptionMetadata } from '@/utils/subscriptionMetadata'
+import { convertXraySubscription } from '@/utils/xrayConverter'
 
 export const useSubscribesStore = defineStore('subscribes', () => {
   const subscribes = ref<App.Subscription[]>([])
@@ -100,7 +100,11 @@ export const useSubscribesStore = defineStore('subscribes', () => {
 
     if (s.type === 'Http') {
       const requestProxyMode = options.requestProxyMode ?? s.requestProxyMode
-      const { headers: h, body: b } = await Requests({
+      const {
+        status,
+        headers: h,
+        body: b,
+      } = await Requests({
         method: options.requestMethod ?? s.requestMethod,
         url: options.url ?? s.url,
         headers: { ...s.header.request, ...options.header?.request },
@@ -116,10 +120,15 @@ export const useSubscribesStore = defineStore('subscribes', () => {
           Timeout: options.requestTimeout ?? s.requestTimeout,
         },
       })
+      if (status < 200 || status >= 300)
+        throw new Error(`Subscription request failed: HTTP ${status}`)
       Object.assign(h, s.header.response, options.header?.response)
       metadata = readSubscriptionMetadata(h)
-      if (h['Subscription-Userinfo']) {
-        ;(h['Subscription-Userinfo'] as string).split(/\s*;\s*/).forEach((part) => {
+      const info = Object.entries(h).find(
+        ([key]) => key.toLowerCase() === 'subscription-userinfo',
+      )?.[1]
+      if (typeof info === 'string') {
+        info.split(/\s*;\s*/).forEach((part) => {
           const [key, value] = part.split('=') as [string, string]
           userInfo[key] = parseInt(value) || 0
         })
@@ -127,10 +136,9 @@ export const useSubscribesStore = defineStore('subscribes', () => {
       body = b
     }
 
-    const xray = s.type === 'Manual' ? null : parseXraySubscription(body)
+    const xray = s.type === 'Manual' ? null : convertXraySubscription(body)
     if (xray) {
-      const configs = JSON.parse(body)
-      proxies = (Array.isArray(configs) ? configs : [configs]).flatMap((config) => config.outbounds)
+      proxies = xray.outbounds
     } else if (isValidSubJson(body)) {
       proxies = JSON.parse(body).outbounds
     } else if (isValidSubYAML(body)) {
@@ -146,10 +154,6 @@ export const useSubscribesStore = defineStore('subscribes', () => {
     const pluginStore = usePluginsStore()
 
     proxies = await pluginStore.onSubscribeTrigger(proxies, s)
-
-    if (xray && proxies.some((proxy) => typeof proxy.type !== 'string' || typeof proxy.tag !== 'string')) {
-      throw new Error('Xray outbounds require conversion before they can be imported')
-    }
 
     if (proxies.some((proxy) => proxy.name && !proxy.tag) || proxies[0]?.base64) {
       throw 'You need to install the [节点转换] plugin first'
@@ -179,7 +183,7 @@ export const useSubscribesStore = defineStore('subscribes', () => {
     s.upload = userInfo.upload ?? 0
     s.download = userInfo.download ?? 0
     s.total = userInfo.total ?? 0
-    s.expire = userInfo.expire * 1000
+    s.expire = (userInfo.expire ?? 0) * 1000
     s.updateTime = Date.now()
     s.proxies = proxies.map(({ tag, type }) => {
       // Keep the original ID value of the proxy unchanged
@@ -200,6 +204,7 @@ export const useSubscribesStore = defineStore('subscribes', () => {
 
     Object.assign(s, subscription)
     if (Object.keys(metadata).length) s.metadata = { ...s.metadata, ...metadata }
+    if (xray && s.type === 'File' && s.url === s.path) s.path = `data/subscribes/${s.id}.json`
     s.proxies = _proxies.map(({ tag, type }) => {
       // Keep the original ID value of the proxy unchanged
       const id = s.proxies.find((v) => v.tag === tag)?.id || sampleID()
@@ -208,6 +213,16 @@ export const useSubscribesStore = defineStore('subscribes', () => {
 
     if (s.type === 'Http' || (s.type === 'File' && s.url !== s.path)) {
       proxies = omitArray(_proxies, ['__id__', '__tmp__id__'])
+      if (xray) {
+        await WriteFile(
+          s.path + '.xray.json',
+          JSON.stringify(
+            { original: JSON.parse(body), sources: xray.sources, aliases: xray.aliases },
+            null,
+            2,
+          ),
+        )
+      }
       await WriteFile(s.path, JSON.stringify(proxies, null, 2))
     }
   }

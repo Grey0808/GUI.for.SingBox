@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs",
     "dev": "vite --host",
     "build": "run-p type-check \"build-only {@}\" --",
     "build-only": "vite build",

@@ -48,10 +48,23 @@ export function parseXraySubscription(body: string): XrayNode[] | null {
   const result: XrayNode[] = []
   for (const config of records) {
     const routing = object(config.routing) ? config.routing : {}
+    if (routing.balancers !== undefined && !Array.isArray(routing.balancers))
+      throw Error('Xray: invalid routing.balancers')
     const balancers = Array.isArray(routing.balancers) ? routing.balancers : []
+    for (const group of balancers) {
+      if (
+        !object(group) ||
+        typeof group.tag !== 'string' ||
+        !Array.isArray(group.selector) ||
+        !group.selector.every((prefix) => typeof prefix === 'string')
+      )
+        throw Error('Xray: invalid balancer selector')
+    }
     for (const source of config.outbounds as JsonObject[]) {
       const protocol = source.protocol as string
-      if (['freedom', 'blackhole', 'dns'].includes(protocol)) continue
+      // Local routing/control outbounds are not remote subscription nodes.
+      // Their original configuration is retained in the source document.
+      if (['freedom', 'blackhole', 'dns', 'loopback'].includes(protocol)) continue
       const tag = typeof source.tag === 'string' ? source.tag : ''
       const groups = balancers.flatMap((group): string[] => {
         if (!object(group) || typeof group.tag !== 'string' || !Array.isArray(group.selector))
