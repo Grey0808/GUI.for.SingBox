@@ -14,12 +14,11 @@ import {
   BrowserOpenURL,
   MakeDir,
   FileExists,
+  PathsReferToSameFile,
   OpenDir,
 } from '@/bridge'
 import { CoreWorkingDirectory } from '@/constant/kernel'
 import { Branch, OS } from '@/enums/app'
-import { parseCoreVersion } from '@/utils/coreCapabilities'
-import { coreReleaseSources } from '@/utils/coreReleases'
 import { useAppSettingsStore, useEnvStore, useKernelApiStore } from '@/stores'
 import {
   getGitHubApiAuthorization,
@@ -32,6 +31,9 @@ import {
   getKernelFileName,
   getKernelAssetFileName,
 } from '@/utils'
+import { parseCoreVersion } from '@/utils/coreCapabilities'
+import { coreReleaseSources } from '@/utils/coreReleases'
+import { isCorePinned, beginCoreMutation } from '@/utils/coreSelection'
 
 const StableUrl = `${coreReleaseSources.official.api}/latest`
 const AlphaUrl = `${coreReleaseSources.official.api}?per_page=3`
@@ -64,7 +66,11 @@ export const useCoreBranch = (isAlpha = false) => {
   const restartable = computed(() => {
     const { branch } = appSettings.app.kernel
     if (!kernelApiStore.running) return false
-    return localVersion.value && downloadCompleted.value && branch === (isAlpha ? Branch.Alpha : Branch.Main)
+    return (
+      localVersion.value &&
+      downloadCompleted.value &&
+      branch === (isAlpha ? Branch.Alpha : Branch.Main)
+    )
   })
 
   const updatable = computed(
@@ -76,11 +82,29 @@ export const useCoreBranch = (isAlpha = false) => {
   const CoreFilePath = `${CoreWorkingDirectory}/${getKernelFileName(isAlpha)}`
   const CoreBakFilePath = `${CoreFilePath}.bak`
 
+  const assertUnpinned = async () => {
+    const kernel = appSettings.app.kernel
+    if (isCorePinned(kernel, { branch: isAlpha ? 'alpha' : 'main' }))
+      throw Error('Unpin this core before updating or restoring it')
+    if (!(await FileExists(CoreFilePath))) return
+    for (const id of kernel.pinnedCores || []) {
+      if (!id.startsWith('custom:')) continue
+      const path = id.slice(7)
+      if ((await FileExists(path)) && (await PathsReferToSameFile(path, CoreFilePath)))
+        throw Error('Unpin the custom executable referring to this core first')
+    }
+  }
+
   const downloadCore = async () => {
+    if (downloading.value) return
+    let releaseMutation: (() => void) | undefined
     downloading.value = true
     downloadProgress.value = ''
     cancelDownload.value = undefined
     try {
+      const selection = { branch: isAlpha ? ('alpha' as const) : ('main' as const) }
+      releaseMutation = beginCoreMutation(selection)
+      await assertUnpinned()
       const { body } = await HttpGet<Record<string, any>>(releaseUrl, {
         Authorization: getGitHubApiAuthorization(),
       })
@@ -96,7 +120,8 @@ export const useCoreBranch = (isAlpha = false) => {
       if (digest && !/^sha256:[a-f\d]{64}$/i.test(digest)) {
         throw new Error('Unsupported or invalid release digest')
       }
-      if (!digest) message.warn('Release does not provide a SHA-256 digest; download is not checksum verified')
+      if (!digest)
+        message.warn('Release does not provide a SHA-256 digest; download is not checksum verified')
       if (asset.uploader.login !== 'github-actions[bot]') {
         await confirm('common.warning', 'settings.kernel.risk', {
           type: 'text',
@@ -147,11 +172,17 @@ export const useCoreBranch = (isAlpha = false) => {
       if (!candidate.endsWith('.exe')) await Exec('chmod', ['+x', await AbsolutePath(candidate)])
       await Exec(candidate, ['version'])
 
-      if (kernelApiStore.running && appSettings.app.kernel.branch === (isAlpha ? Branch.Alpha : Branch.Main)) {
+      if (
+        kernelApiStore.running ||
+        kernelApiStore.starting ||
+        kernelApiStore.stopping ||
+        kernelApiStore.restarting
+      ) {
         throw new Error('Stop the running core before installing this version')
       }
 
       const hadCore = await FileExists(CoreFilePath)
+      await assertUnpinned()
       if (hadCore) await MoveFile(CoreFilePath, CoreBakFilePath)
       try {
         await MoveFile(candidate, CoreFilePath)
@@ -160,7 +191,9 @@ export const useCoreBranch = (isAlpha = false) => {
           try {
             await MoveFile(CoreBakFilePath, CoreFilePath)
           } catch (restoreError) {
-            throw new Error(`Core installation failed: ${error}; restore failed: ${restoreError}. Backup: ${CoreBakFilePath}`)
+            throw new Error(
+              `Core installation failed: ${error}; restore failed: ${restoreError}. Backup: ${CoreBakFilePath}`,
+            )
           }
         }
         throw error
@@ -182,6 +215,7 @@ export const useCoreBranch = (isAlpha = false) => {
       message.error(error.message || error)
       downloadCompleted.value = false
     } finally {
+      releaseMutation?.()
       cancelDownload.value = undefined
       downloading.value = false
     }
@@ -246,12 +280,26 @@ export const useCoreBranch = (isAlpha = false) => {
   }
 
   const rollbackCore = async () => {
+    const selection = { branch: isAlpha ? ('alpha' as const) : ('main' as const) }
+    await assertUnpinned()
     await confirm('common.warning', 'settings.kernel.rollback')
-
-    const doRollback = () => MoveFile(CoreBakFilePath, CoreFilePath)
+    await assertUnpinned()
+    const doRollback = async () => {
+      const release = beginCoreMutation(selection)
+      try {
+        await assertUnpinned()
+        // A custom path can alias a legacy executable, regardless of branch name.
+        if (kernelApiStore.running || kernelApiStore.starting || kernelApiStore.stopping)
+          throw Error('Stop the core before restoring this executable')
+        await MoveFile(CoreBakFilePath, CoreFilePath)
+      } finally {
+        release()
+      }
+    }
 
     const { branch } = appSettings.app.kernel
-    const isCurrentRunning = kernelApiStore.running && branch === (isAlpha ? Branch.Alpha : Branch.Main)
+    const isCurrentRunning =
+      kernelApiStore.running && branch === (isAlpha ? Branch.Alpha : Branch.Main)
     if (isCurrentRunning) {
       await kernelApiStore.restartCore(doRollback)
     } else {

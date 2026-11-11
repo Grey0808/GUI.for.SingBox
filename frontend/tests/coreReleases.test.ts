@@ -3,6 +3,9 @@ import { test } from 'node:test'
 
 import {
   coreReleaseSources,
+  coreVersionDirectory,
+  selectedCorePath,
+  validateCustomCorePath,
   lxCorePath,
   sha256FromSums,
   windowsAmd64AssetName,
@@ -19,6 +22,24 @@ test('selects exact Windows assets for official and LX releases', () => {
   assert.equal(lxCorePath('v1.14.4-lx.33'), 'data/sing-box/versions/lx/1.14.4-lx.33/sing-box.exe')
   assert.throws(() => lxCorePath('v1.14.4'))
   assert.throws(() => lxCorePath('../escape'))
+})
+
+test('all selection variants resolve to isolated managed paths or the unchanged local executable', () => {
+  assert.equal(selectedCorePath({ branch: 'main' }, 'windows'), 'data/sing-box/sing-box.exe')
+  assert.equal(selectedCorePath({ branch: 'alpha' }, 'linux'), 'data/sing-box/sing-box-latest')
+  assert.equal(
+    selectedCorePath({ branch: 'official', officialVersion: 'v1.14.4' }, 'windows'),
+    'data/sing-box/versions/official/1.14.4/sing-box.exe',
+  )
+  assert.equal(
+    selectedCorePath({ branch: 'custom', customPath: 'D:\\local\\renamed.exe' }, 'windows'),
+    'D:\\local\\renamed.exe',
+  )
+  assert.equal(validateCustomCorePath('\\\\server\\share\\core.exe'), '\\\\server\\share\\core.exe')
+  for (const value of ['', '../data', '1.14.4/../../data', '1.14.4-lx.33'])
+    assert.throws(() => coreVersionDirectory('official', value))
+  for (const value of ['', 'relative.exe', 'C:relative.exe', 'C:\\local\\data.json'])
+    assert.throws(() => validateCustomCorePath(value))
 })
 
 test('selects only an exact, unambiguous checksum entry', () => {

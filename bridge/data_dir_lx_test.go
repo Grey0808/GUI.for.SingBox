@@ -3,10 +3,11 @@ package bridge
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
-func TestLXPathsFollowDataDirectory(t *testing.T) {
+func TestManagedCorePathsFollowDataDirectory(t *testing.T) {
 	old := *Env
 	t.Cleanup(func() { *Env = old })
 	base := t.TempDir()
@@ -28,12 +29,13 @@ func TestLXPathsFollowDataDirectory(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			initDataDir(tc.directory, tc.portable)
-			if filepath.Clean(Env.DataDir) != filepath.Clean(tc.expected) {
-				t.Fatalf("data directory = %s, want %s", Env.DataDir, tc.expected)
-			}
+			assertSameDirectory(t, Env.DataDir, tc.expected)
 			for _, path := range []string{
 				"data/sing-box/versions/lx/1.14.4-lx.33/sing-box.exe",
 				"data/.cache/lx-install-test/release.zip",
+				"data/sing-box/versions/official/1.14.4/sing-box.exe",
+				"data/.cache/official-install-test/release.zip",
+				"data/sing-box/versions/official/1.14.4/libcronet.dll",
 				"data/sing-box/config.json",
 			} {
 				want := filepath.Join(Env.DataDir, filepath.FromSlash(path[len("data/"):]))
@@ -42,5 +44,35 @@ func TestLXPathsFollowDataDirectory(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWindowsDefaultDataDirectoryIsIsolated(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("requires the Windows filesystem APIs")
+	}
+	old := *Env
+	t.Cleanup(func() { *Env = old })
+	base := t.TempDir()
+	Env.BasePath = filepath.Join(base, "app")
+	Env.OS, Env.AppId = "windows", "codex-core-data-dir-test"
+	t.Setenv("LOCALAPPDATA", filepath.Join(base, "local app data"))
+	initDataDir("", false)
+	want := filepath.Join(base, "local app data", Env.AppId)
+	assertSameDirectory(t, Env.DataDir, want)
+}
+
+func assertSameDirectory(t *testing.T, actual, expected string) {
+	t.Helper()
+	one, err := os.Stat(actual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := os.Stat(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(one, two) {
+		t.Fatalf("data directory = %s, want %s", actual, expected)
 	}
 }

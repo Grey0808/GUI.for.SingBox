@@ -6,6 +6,10 @@ export function AbsolutePath(arg1) {
   return window['go']['bridge']['App']['AbsolutePath'](arg1);
 }
 
+export function PathsReferToSameFile(arg1, arg2) {
+  return window['go']['bridge']['App']['PathsReferToSameFile'](arg1, arg2);
+}
+
 export function CloseMMDB(arg1, arg2) {
   return window['go']['bridge']['App']['CloseMMDB'](arg1, arg2);
 }
@@ -84,6 +88,10 @@ export function OpenMMDB(arg1, arg2) {
 
 export function OpenURI(arg1) {
   return window['go']['bridge']['App']['OpenURI'](arg1);
+}
+
+export function ProcessMatchesExecutable(arg1, arg2) {
+  return window['go']['bridge']['App']['ProcessMatchesExecutable'](arg1, arg2);
 }
 
 export function ProcessInfo(arg1) {

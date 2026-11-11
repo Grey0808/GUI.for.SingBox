@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import ts from 'typescript'
 
 import { parseCoreVersion } from '../src/utils/coreCapabilities.ts'
-import { lxCorePath } from '../src/utils/coreReleases.ts'
+import { selectedCorePath } from '../src/utils/coreReleases.ts'
 import { xhttpUnavailableReason } from '../src/utils/xhttpCompatibility.ts'
 
 test('actual capability store rechecks binary and restores stored XHTTP nodes across selection changes', async () => {
@@ -35,7 +35,7 @@ test('actual capability store rechecks binary and restores stored XHTTP nodes ac
       ReadFile: async () => saved,
     },
     '@/utils/coreCapabilities': { parseCoreVersion },
-    '@/utils/coreReleases': { lxCorePath },
+    '@/utils/coreReleases': { selectedCorePath },
     '@/utils/xhttpCompatibility': { xhttpUnavailableReason },
     '@/utils/eventBus': { eventBus: { on() {} } },
   }
@@ -73,4 +73,16 @@ test('actual capability store rechecks binary and restores stored XHTTP nodes ac
   assert.equal(store.reason('sub', 'X'), '')
   assert.equal(store.reasonByTag('X'), '')
   assert.equal(store.reason('sub', 'S'), '')
+  settings.app.kernel.branch = 'official'
+  settings.app.kernel.officialVersion = '1.14.4'
+  report = 'sing-box version 1.14.4\nTags: with_clash_api'
+  await store.refresh()
+  assert.ok(store.reason('sub', 'X'))
+  assert.ok(paths.includes('data/sing-box/versions/official/1.14.4/sing-box.exe'))
+  settings.app.kernel.branch = 'custom'
+  settings.app.kernel.customPath = 'D:\\fixtures\\local.exe'
+  report = 'sing-box version 1.14.4-lx.33\nTags: with_xhttp'
+  await store.refresh()
+  assert.equal(store.reason('sub', 'X'), '')
+  assert.ok(paths.includes('D:\\fixtures\\local.exe'))
 })

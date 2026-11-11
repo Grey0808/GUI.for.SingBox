@@ -4,7 +4,7 @@ import { ref, watch } from 'vue'
 import { Exec, FileSHA256, ReadFile } from '@/bridge'
 import { useAppSettingsStore, useSubscribesStore, useEnvStore } from '@/stores'
 import { parseCoreVersion } from '@/utils/coreCapabilities'
-import { lxCorePath } from '@/utils/coreReleases'
+import { selectedCorePath } from '@/utils/coreReleases'
 import { eventBus } from '@/utils/eventBus'
 import { xhttpUnavailableReason, type CoreFacts } from '@/utils/xhttpCompatibility'
 
@@ -16,10 +16,7 @@ export const useCoreCapabilitiesStore = defineStore('core-capabilities', () => {
   const nodes = ref<Record<string, Record<string, any>>>({})
   const nodesLoaded = ref(false)
   let sequence = 0
-  const selectedPath = () =>
-    settings.app.kernel.branch === 'lx'
-      ? lxCorePath(settings.app.kernel.lxVersion || '')
-      : `data/sing-box/sing-box${settings.app.kernel.branch === 'alpha' ? '-latest' : ''}${env.env.os === 'windows' ? '.exe' : ''}`
+  const selectedPath = () => selectedCorePath(settings.app.kernel, env.env.os)
   async function refresh() {
     const token = ++sequence
     facts.value = undefined
@@ -66,9 +63,19 @@ export const useCoreCapabilitiesStore = defineStore('core-capabilities', () => {
         .find(Boolean) || ''
     )
   }
-  watch(() => [settings.app.kernel.branch, settings.app.kernel.lxVersion, env.env.os], refresh, {
-    immediate: true,
-  })
+  watch(
+    () => [
+      settings.app.kernel.branch,
+      settings.app.kernel.lxVersion,
+      settings.app.kernel.officialVersion,
+      settings.app.kernel.customPath,
+      env.env.os,
+    ],
+    refresh,
+    {
+      immediate: true,
+    },
+  )
   watch(
     () => subscriptions.subscribes.map((s) => `${s.id}:${s.updateTime}:${s.path}`).join('|'),
     loadNodes,

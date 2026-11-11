@@ -23,7 +23,7 @@ func TestDownloadHTTPAndChecksum(t *testing.T) {
 	sum := sha256.Sum256([]byte("test release"))
 	cases := []struct {
 		name, path, digest string
-		wantSuccess bool
+		wantSuccess        bool
 	}{
 		{"verified", "/ok", fmt.Sprintf("%x", sum), true},
 		{"no digest", "/ok", "", true},
@@ -45,5 +45,21 @@ func TestDownloadHTTPAndChecksum(t *testing.T) {
 				t.Fatalf("failed download left a file: %v", err)
 			}
 		})
+	}
+}
+
+func TestDownloadInterruptedBodyRemovesPartialFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "1024")
+		_, _ = w.Write([]byte("partial archive"))
+	}))
+	defer server.Close()
+	path := filepath.Join(t.TempDir(), "partial.zip")
+	result := (&App{}).Download(http.MethodGet, server.URL, path, nil, "", RequestOptions{})
+	if result.Flag {
+		t.Fatal("truncated body accepted")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("partial file left behind: %v", err)
 	}
 }

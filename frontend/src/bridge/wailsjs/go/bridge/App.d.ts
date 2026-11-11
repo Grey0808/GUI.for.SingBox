@@ -4,6 +4,8 @@ import {bridge} from '../models';
 
 export function AbsolutePath(arg1:string):Promise<bridge.FlagResult>;
 
+export function PathsReferToSameFile(arg1:string,arg2:string):Promise<bridge.FlagResult>;
+
 export function CloseMMDB(arg1:string,arg2:string):Promise<bridge.FlagResult>;
 
 export function CopyFile(arg1:string,arg2:string):Promise<bridge.FlagResult>;
@@ -45,6 +47,7 @@ export function OpenMMDB(arg1:string,arg2:string):Promise<bridge.FlagResult>;
 export function OpenURI(arg1:string):Promise<bridge.FlagResult>;
 
 export function ProcessInfo(arg1:number):Promise<bridge.FlagResult>;
+export function ProcessMatchesExecutable(arg1:number,arg2:string):Promise<bridge.FlagResult>;
 
 export function ProcessMemory(arg1:number):Promise<bridge.FlagResult>;
 

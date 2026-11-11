@@ -14,13 +14,16 @@ import {
   destroyWebsocket,
   probeApiAvailability,
 } from '@/api/kernel'
-import { ProcessInfo, KillProcess, Exec, ExecBackground, ReadFile, RemoveFile } from '@/bridge'
 import {
-  CoreConfigFilePath,
-  CoreLogFilePath,
-  CorePidFilePath,
-  CoreWorkingDirectory,
-} from '@/constant/kernel'
+  ProcessInfo,
+  ProcessMatchesExecutable,
+  KillProcess,
+  Exec,
+  ExecBackground,
+  ReadFile,
+  RemoveFile,
+} from '@/bridge'
+import { CoreConfigFilePath, CoreLogFilePath, CorePidFilePath } from '@/constant/kernel'
 import { DefaultInboundMixed } from '@/constant/profile'
 import { Branch } from '@/enums/app'
 import { Inbound, RulesetType, TunStack } from '@/enums/kernel'
@@ -36,7 +39,6 @@ import {
 import {
   generateConfigFile,
   updateTrayAndMenus,
-  getKernelFileName,
   normalizeProxyHost,
   restoreProfile,
   deepClone,
@@ -46,8 +48,8 @@ import {
   eventBus,
   sleep,
 } from '@/utils'
-import { lxCorePath } from '@/utils/coreReleases'
-import { restorePreviousCore } from '@/utils/coreSelection'
+import { selectedCorePath } from '@/utils/coreReleases'
+import { restorePreviousCore, assertCoreAvailable } from '@/utils/coreSelection'
 import {
   modeKey,
   modeDefinitionMatches,
@@ -304,12 +306,31 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
   const needRestart = ref(false)
   const coreStateLoading = ref(true)
   let isCoreStartedByThisInstance = false
+  let unverifiedCoreProcess = false
   let { promise: coreStoppedPromise, resolve: coreStoppedResolver } = Promise.withResolvers()
 
   const initCoreState = async () => {
     corePid.value = Number(await ReadFile(CorePidFilePath).catch(() => -1))
     const processName = corePid.value === -1 ? '' : await ProcessInfo(corePid.value).catch(() => '')
-    running.value = processName.startsWith('sing-box')
+    if (processName) {
+      let matches = false
+      try {
+        matches = await ProcessMatchesExecutable(
+          corePid.value,
+          selectedCorePath(appSettingsStore.app.kernel, envStore.env.os),
+        )
+      } catch {
+        /* Unknown identity must never be stopped or automatically replaced. */
+      }
+      if (!matches) {
+        unverifiedCoreProcess = true
+        coreStateLoading.value = false
+        throw Error(
+          'PID file does not identify the selected core. Automatic startup is blocked; verify the process and data directory manually.',
+        )
+      }
+    }
+    running.value = !!processName
 
     coreStateLoading.value = false
 
@@ -403,6 +424,8 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
 
   const startCore = async (_profile?: App.Profile) => {
     if (running.value) throw 'The core is already running'
+    if (unverifiedCoreProcess) throw Error('Unverified PID file: core startup is blocked')
+    assertCoreAvailable(appSettingsStore.app.kernel)
 
     logsStore.clearKernelLog()
 
@@ -420,10 +443,7 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
         pluginsStore.onBeforeCoreStartTrigger(config, profile),
       )
       const isAlpha = branch === Branch.Alpha
-      const corePath =
-        branch === Branch.Lx
-          ? lxCorePath(appSettingsStore.app.kernel.lxVersion || '')
-          : CoreWorkingDirectory + '/' + getKernelFileName(isAlpha)
+      const corePath = selectedCorePath(appSettingsStore.app.kernel, envStore.env.os)
       const args = getKernelRuntimeArgs(isAlpha)
       const runIndex = args.indexOf('run')
       if (runIndex === -1) {
@@ -453,6 +473,10 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
             : 'Rule'
         await updateConfig('mode', desired)
       }
+      if (appSettingsStore.app.kernel.previousKernelSelection)
+        appSettingsStore.app.kernel.lastWorkingSelection = {
+          ...appSettingsStore.app.kernel.previousKernelSelection,
+        }
       delete appSettingsStore.app.kernel.previousKernelSelection
     } catch (error) {
       if (!running.value && restorePreviousCore(appSettingsStore.app.kernel)) {
@@ -465,6 +489,7 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
   }
 
   const stopCore = async () => {
+    if (unverifiedCoreProcess) throw Error('Unverified PID file: stopping this process is blocked')
     if (!running.value) throw 'The core is not running'
 
     stopping.value = true

@@ -157,6 +157,28 @@ func (a *App) ExecBackground(path string, args []string, outEvent string, endEve
 	return FlagResult{true, pid}
 }
 
+// ProcessMatchesExecutable avoids treating a reused PID or a similarly named
+// binary as the selected core. Stat/SameFile also handles custom-path symlinks.
+func (a *App) ProcessMatchesExecutable(pid int32, path string) FlagResult {
+	proc, err := process.NewProcess(pid)
+	if err != nil {
+		return FlagResult{false, err.Error()}
+	}
+	executable, err := proc.Exe()
+	if err != nil {
+		return FlagResult{false, err.Error()}
+	}
+	actual, err := os.Stat(executable)
+	if err != nil {
+		return FlagResult{false, err.Error()}
+	}
+	expected, err := os.Stat(resolvePath(path))
+	if err != nil {
+		return FlagResult{false, err.Error()}
+	}
+	return FlagResult{true, strconv.FormatBool(os.SameFile(actual, expected))}
+}
+
 func (a *App) ProcessInfo(pid int32) FlagResult {
 	log.Printf("ProcessInfo: %d", pid)
 

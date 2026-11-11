@@ -493,7 +493,7 @@ export const usePluginsStore = defineStore('plugins', () => {
     releasePluginRuntimeCache(id)
 
     if (plugin.path.startsWith('data')) {
-      await RemoveFile(plugin.path).catch((_) => {})
+      await RemoveFile(plugin.path).catch(() => {})
     }
     if (appSettingsStore.app.pluginSettings[plugin.id]) {
       if (await confirm('Tips', 'plugins.removeConfiguration').catch(() => 0)) {

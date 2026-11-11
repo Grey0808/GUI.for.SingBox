@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import ts from 'typescript'
 
@@ -24,14 +25,14 @@ test('actual full config generator excludes XHTTP and repairs callback refs acro
   const x = {
     type: 'vless',
     tag: 'X',
-    server: 'example.invalid',
+    server: '192.0.2.1',
     server_port: 443,
     uuid: '00000000-0000-4000-8000-000000000001',
     transport: { type: 'xhttp', path: '/' },
   }
   const source = JSON.stringify([
     x,
-    { type: 'socks', tag: 'S', server: 'example.invalid', server_port: 1080 },
+    { type: 'socks', tag: 'S', server: '192.0.2.2', server_port: 1080 },
   ])
   const written = new Map()
   const capabilities = { facts: undefined, refresh: async () => capabilities.facts }
@@ -119,7 +120,19 @@ test('actual full config generator excludes XHTTP and repairs callback refs acro
       )
       assert.equal(config.route.rules[0].outbound, compatible ? 'X' : 'S')
       assert.equal(config.route.final, 'G')
+      assert.equal(config.route.default_domain_resolver, undefined)
       assert.ok(config.experimental && config.dns && config.http_clients)
+      // Optional export for a separate, check-only integration pass; never run a core.
+      if (process.env.SING_BOX_CHECK_DIRECTORY && ['1.14.4', '1.14.4-lx.33'].includes(version)) {
+        assert.deepEqual(config.inbounds, [])
+        assert.ok(!config.experimental.cache_file.enabled)
+        assert.ok(!config.experimental.clash_api.external_controller)
+        assert.deepEqual(config.route.rule_set || [], [])
+        await writeFile(
+          join(process.env.SING_BOX_CHECK_DIRECTORY, `${version}.json`),
+          JSON.stringify(config, null, 2),
+        )
+      }
     }
     assert.equal(JSON.parse(source).length, 2)
     profile.customModes = [
@@ -140,6 +153,22 @@ test('actual full config generator excludes XHTTP and repairs callback refs acro
       ['Rule', 'Global', 'Direct'].every((mode) =>
         withModes.route.rules.some((r) => r.clash_mode === mode),
       ),
+    )
+    if (process.env.SING_BOX_CHECK_DIRECTORY)
+      await writeFile(
+        join(process.env.SING_BOX_CHECK_DIRECTORY, 'lx-modes.json'),
+        JSON.stringify(withModes, null, 2),
+      )
+    profile.dns.servers = [{ id: 'local', tag: 'local-dns', type: 'local' }]
+    profile.route.default_domain_resolver.server = 'local'
+    await generator.generateConfigFile(profile, async (config) => config)
+    assert.deepEqual(JSON.parse(written.get('fixture/config.json')).route.default_domain_resolver, {
+      server: 'local-dns',
+    })
+    profile.route.default_domain_resolver.server = 'missing'
+    await assert.rejects(
+      generator.generateConfigFile(profile, async (config) => config),
+      /default DNS resolver is missing/,
     )
   } finally {
     globalThis.window = previous

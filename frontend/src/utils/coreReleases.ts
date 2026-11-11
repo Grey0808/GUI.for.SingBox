@@ -29,6 +29,33 @@ export function lxCorePath(version: string): string {
   return `${lxCoreDirectory(version)}/sing-box.exe`
 }
 
+export function coreVersionDirectory(flavor: CoreFlavor, version: string): string {
+  if (flavor === 'lx') return lxCoreDirectory(version)
+  windowsAmd64AssetName(version)
+  const normalized = version.replace(/^v/, '')
+  if (!/^\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?$/.test(normalized))
+    throw Error('Invalid official core version')
+  return `data/sing-box/versions/official/${normalized}`
+}
+export function managedCorePath(flavor: CoreFlavor, version: string) {
+  return `${coreVersionDirectory(flavor, version)}/sing-box.exe`
+}
+export function validateCustomCorePath(path: string) {
+  if (!/^(?:[a-z]:[\\/]|\\\\[^\\/]+[\\/])/i.test(path) || !/\.exe$/i.test(path))
+    throw Error('Choose an absolute Windows .exe path')
+  return path
+}
+export function selectedCorePath(
+  selection: import('./coreSelection').Selection,
+  os: string,
+): string {
+  if (selection.branch === 'custom') return validateCustomCorePath(selection.customPath || '')
+  if (selection.branch === 'lx') return managedCorePath('lx', selection.lxVersion || '')
+  if (selection.branch === 'official')
+    return managedCorePath('official', selection.officialVersion || '')
+  return `data/sing-box/sing-box${selection.branch === 'alpha' ? '-latest' : ''}${os === 'windows' ? '.exe' : ''}`
+}
+
 export function sha256FromSums(text: string, assetName: string): string {
   const matches = text.split(/\r?\n/).flatMap((line) => {
     const match = line.match(/^([a-f\d]{64})\s+\*?(.+)$/i)

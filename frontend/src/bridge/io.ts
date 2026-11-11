@@ -65,6 +65,12 @@ export const FileSHA256 = async (path: string) => {
   return data
 }
 
+export const PathsReferToSameFile = async (first: string, second: string) => {
+  const { flag, data } = await Bridge.PathsReferToSameFile(first, second)
+  if (!flag) throw data
+  return data === 'true'
+}
+
 export const AbsolutePath = async (path: string) => {
   const { flag, data } = await Bridge.AbsolutePath(path)
   if (!flag) {

@@ -87,9 +87,13 @@ declare namespace App {
     }
     kernel: {
       realMemoryUsage: boolean
-      branch: 'main' | 'alpha' | 'lx'
+      branch: import('@/utils/coreSelection').Selection['branch']
       lxVersion?: string
-      previousKernelSelection?: { branch: 'main' | 'alpha' | 'lx'; lxVersion?: string }
+      officialVersion?: string
+      customPath?: string
+      pinnedCores?: string[]
+      previousKernelSelection?: import('@/utils/coreSelection').Selection
+      lastWorkingSelection?: import('@/utils/coreSelection').Selection
       profile: string
       autoClose: boolean
       unAvailable: boolean

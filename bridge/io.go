@@ -256,6 +256,23 @@ func (a *App) AbsolutePath(path string) FlagResult {
 	return FlagResult{true, absPath}
 }
 
+// PathsReferToSameFile follows symlinks and detects aliases of a selected core
+// before deleting a managed version. It never changes either file.
+func (a *App) PathsReferToSameFile(first string, second string) FlagResult {
+	one, err := os.Stat(resolvePath(first))
+	if err != nil {
+		return FlagResult{false, err.Error()}
+	}
+	two, err := os.Stat(resolvePath(second))
+	if err != nil {
+		return FlagResult{false, err.Error()}
+	}
+	if os.SameFile(one, two) {
+		return FlagResult{true, "true"}
+	}
+	return FlagResult{true, "false"}
+}
+
 func (a *App) UnzipZIPFile(path string, output string) FlagResult {
 	log.Printf("UnzipZIPFile: %s -> %s", path, output)
 

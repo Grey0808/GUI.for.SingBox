@@ -47,6 +47,8 @@ export enum Branch {
   Main = 'main',
   Alpha = 'alpha',
   Lx = 'lx',
+  Official = 'official',
+  Custom = 'custom',
 }
 
 export enum RequestProxyMode {

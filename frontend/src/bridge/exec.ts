@@ -76,6 +76,12 @@ export const ProcessInfo = async (pid: number) => {
   return data
 }
 
+export const ProcessMatchesExecutable = async (pid: number, path: string) => {
+  const { flag, data } = await Bridge.ProcessMatchesExecutable(pid, path)
+  if (!flag) throw data
+  return data === 'true'
+}
+
 export const ProcessMemory = async (pid: number) => {
   const { flag, data } = await Bridge.ProcessMemory(pid)
   if (!flag) {

@@ -3,8 +3,9 @@ import { modal } from '@/utils'
 
 import BranchDetail from './components/BranchDetail.vue'
 import CoreConfiguration from './components/CoreConfig.vue'
-import SwitchBranch from './components/SwitchBranch.vue'
+import LocalCore from './components/LocalCore.vue'
 import LxCore from './components/LxCore.vue'
+import SwitchBranch from './components/SwitchBranch.vue'
 
 const handleCoreConfiguraion = async (isAlpha: boolean) => {
   const m = modal({ title: 'settings.kernel.config.name', minWidth: '70' })
@@ -17,6 +18,8 @@ const handleCoreConfiguraion = async (isAlpha: boolean) => {
     <BranchDetail :is-alpha="false" @config="handleCoreConfiguraion(false)" />
     <BranchDetail :is-alpha="true" @config="handleCoreConfiguraion(true)" />
     <LxCore />
+    <LxCore flavor="official" />
+    <LocalCore />
     <SwitchBranch />
   </div>
 </template>

@@ -31,7 +31,6 @@ const updatePosition = () => {
 
   overlayEl.style.minWidth = `${triggerRect.width}px`
 
-  const overlayHeight = overlayEl.offsetHeight
   const overlayWidth = overlayEl.offsetWidth
 
   const screenEdgeMargin = 8

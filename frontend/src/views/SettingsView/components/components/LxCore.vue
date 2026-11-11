@@ -5,15 +5,18 @@ import { useI18n } from 'vue-i18n'
 import { useCoreLx } from '@/hooks/useCoreLx'
 import { message } from '@/utils'
 
+import type { CoreFlavor } from '@/utils/coreReleases'
+
 const { t } = useI18n()
-const lx = useCoreLx()
+const props = withDefaults(defineProps<{ flavor?: CoreFlavor }>(), { flavor: 'lx' })
+const lx = useCoreLx(props.flavor)
 const releaseOptions = computed(() =>
   lx.releases.value.map((item) => ({ label: item.tag_name, value: item.tag_name })),
 )
 const installedOptions = computed(() =>
   lx.installed.value.map((item) => ({ label: item, value: item })),
 )
-const run = async (action: () => Promise<void>, showSuccess = false) => {
+const run = async (action: () => void | Promise<void>, showSuccess = false) => {
   try {
     await action()
     if (showSuccess) message.success('common.success')
@@ -30,7 +33,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="px-8 py-12 text-18 font-bold">sing-box-lx</div>
+  <div class="px-8 py-12 text-18 font-bold">
+    {{ flavor === 'lx' ? 'sing-box-lx' : t('settings.kernel.managedOfficial') }}
+  </div>
   <Card>
     <div v-if="!lx.supported.value" class="py-8">{{ t('settings.kernel.lxWindowsOnly') }}</div>
     <template v-else>
@@ -59,6 +64,14 @@ onMounted(() => {
         >
         <span v-if="lx.active.value"
           >{{ t('settings.kernel.lxActive') }}: {{ lx.active.value }}</span
+        >
+        <Button :disabled="!lx.selectedInstalled.value || lx.busy.value" @click="run(lx.pin)">{{
+          lx.pinned.value ? t('settings.kernel.unpin') : t('settings.kernel.pin')
+        }}</Button>
+        <Button
+          :disabled="!lx.selectedInstalled.value || lx.busy.value"
+          @click="run(lx.remove, true)"
+          >{{ t('common.delete') }}</Button
         >
       </div>
     </template>
