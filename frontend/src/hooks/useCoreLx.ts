@@ -88,6 +88,7 @@ export function useCoreLx() {
   }
 
   async function install() {
+    if (!supported.value) throw new Error('LX installation requires Windows AMD64')
     if (busy.value) return
     busy.value = true
     canceled = false
@@ -159,10 +160,13 @@ export function useCoreLx() {
   }
 
   async function activate() {
+    if (!supported.value) throw new Error('LX selection requires Windows AMD64')
     if (kernel.running || kernel.starting || kernel.stopping || kernel.restarting)
       throw new Error('Stop the core before changing its version')
     const path = lxCorePath(selectedInstalled.value)
     if (!(await FileExists(path))) throw new Error('Selected version is not installed')
+    if (kernel.running || kernel.starting || kernel.stopping || kernel.restarting)
+      throw new Error('Core state changed while selecting a version')
     selectLX(settings.app.kernel, selectedInstalled.value)
   }
 
