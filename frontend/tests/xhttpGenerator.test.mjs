@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import ts from 'typescript'
 
 import { parseCoreVersion } from '../src/utils/coreCapabilities.ts'
+import { applyCustomModes } from '../src/utils/customModes.ts'
 import { compatibleConfig } from '../src/utils/xhttpCompatibility.ts'
 
 test('actual full config generator excludes XHTTP and repairs callback refs across core switches', async () => {
@@ -36,6 +37,7 @@ test('actual full config generator excludes XHTTP and repairs callback refs acro
   const capabilities = { facts: undefined, refresh: async () => capabilities.facts }
   const settings = { app: { kernel: { branch: 'main' } } }
   const modules = {
+    '@/utils/customModes': { applyCustomModes },
     '@/utils/xhttpCompatibility': { compatibleConfig },
     '@/stores/coreCapabilities': { useCoreCapabilitiesStore: () => capabilities },
     '@/enums/kernel': enums,
@@ -120,6 +122,25 @@ test('actual full config generator excludes XHTTP and repairs callback refs acro
       assert.ok(config.experimental && config.dns && config.http_clients)
     }
     assert.equal(JSON.parse(source).length, 2)
+    profile.customModes = [
+      {
+        id: 'work',
+        name: 'Work',
+        icon: '💼',
+        outbound: 'group',
+        rules: [{ domain_suffix: ['example.invalid'] }],
+      },
+    ]
+    profile.selectedMode = 'Custom_work'
+    await generator.generateConfigFile(profile, async (config) => config)
+    const withModes = JSON.parse(written.get('fixture/config.json'))
+    assert.equal(withModes.experimental.clash_api.default_mode, 'Custom_work')
+    assert.equal(withModes.route.rules.find((r) => r.clash_mode === 'Custom_work').outbound, 'G')
+    assert.ok(
+      ['Rule', 'Global', 'Direct'].every((mode) =>
+        withModes.route.rules.some((r) => r.clash_mode === mode),
+      ),
+    )
   } finally {
     globalThis.window = previous
   }

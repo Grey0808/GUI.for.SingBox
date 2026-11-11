@@ -26,6 +26,7 @@ import {
   APP_VERSION,
   handleUseProxy,
 } from '@/utils'
+import { modeKey } from '@/utils/customModes'
 
 const getTrayIcons = () => {
   const envStore = useEnvStore()
@@ -188,11 +189,17 @@ const getTrayMenus = () => {
       type: 'item',
       text: 'kernel.mode',
       hidden: !kernelApiStore.running,
-      children: ModeOptions.map((mode) => ({
+      children: [
+        ...ModeOptions,
+        ...(profilesStore.currentProfile?.customModes || []).map((mode) => ({
+          label: `${mode.icon} ${mode.name}`,
+          value: modeKey(mode),
+        })),
+      ].map((mode) => ({
         type: 'item',
         text: mode.label,
         checkable: true,
-        checked: kernelApiStore.config.mode === mode.value,
+        checked: kernelApiStore.config.mode.toLowerCase() === mode.value.toLowerCase(),
         event: () => handleChangeMode(mode.value),
       })),
     },

@@ -4,14 +4,23 @@ import { useI18n } from 'vue-i18n'
 
 import { ProcessMemory } from '@/bridge'
 import { ModeOptions } from '@/constant/kernel'
-import { useEnvStore, useAppStore, useKernelApiStore, useAppSettingsStore } from '@/stores'
+import {
+  useEnvStore,
+  useAppStore,
+  useKernelApiStore,
+  useAppSettingsStore,
+  useProfilesStore,
+} from '@/stores'
 import { formatBytes, handleChangeMode, message, modal } from '@/utils'
+import { modeKey } from '@/utils/customModes'
 
 import CommonController from './CommonController.vue'
 import ConnectionsController from './ConnectionsController.vue'
 import LogsController from './LogsController.vue'
+import ManageModesButton from './ManageModesButton.vue'
 
 const trafficHistory = ref<[number[], number[]]>([[], []])
+const profiles = useProfilesStore()
 const statistics = ref({
   upload: 0,
   download: 0,
@@ -261,18 +270,32 @@ onUnmounted(() => {
       <div class="mode-panel ml-12 flex-1">
         <div class="mode-panel__title py-16 font-bold" style="color: var(--card-color)">
           {{ t('kernel.mode') }}
+          <ManageModesButton />
+          <div class="text-12">{{ t('customModes.active') }}: {{ kernelApiStore.config.mode }}</div>
         </div>
         <div class="mode-panel__list flex flex-col gap-12">
           <Card
             v-for="mode in ModeOptions"
             :key="mode.value"
-            :selected="kernelApiStore.config.mode === mode.value"
+            :selected="kernelApiStore.config.mode.toLowerCase() === mode.value.toLowerCase()"
             :title="t(mode.label)"
             :class="['home-mode-card', `home-mode-card--${String(mode.value).toLowerCase()}`]"
             class="cursor-pointer"
             @click="handleChangeMode(mode.value as any)"
           >
             <div class="text-12 py-2">{{ t(mode.desc) }}</div>
+          </Card>
+          <Card
+            v-for="mode in profiles.currentProfile?.customModes || []"
+            :key="mode.id"
+            :title="mode.icon + ' ' + mode.name"
+            :selected="kernelApiStore.config.mode.toLowerCase() === modeKey(mode).toLowerCase()"
+            :class="{ 'opacity-50': kernelApiStore.modePending(mode) }"
+            @click="handleChangeMode(modeKey(mode))"
+          >
+            <div v-if="kernelApiStore.modePending(mode)" class="text-12">
+              {{ t('customModes.pending') }}
+            </div>
           </Card>
         </div>
       </div>

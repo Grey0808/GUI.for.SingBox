@@ -9,6 +9,7 @@ import { APP_TITLE, debounce, message, modal } from '@/utils'
 
 import GroupsController from './components/GroupsController.vue'
 import KernelLogs from './components/KernelLogs.vue'
+import ManageModesButton from './components/ManageModesButton.vue'
 import OverView from './components/OverView.vue'
 import QuickStart from './components/QuickStart.vue'
 
@@ -140,6 +141,7 @@ watch(showController, (v) => {
         <Button :loading="kernelApiStore.starting" type="primary" @click="handleStartKernel">
           {{ t('home.overview.start') }}
         </Button>
+        <ManageModesButton />
         <Button type="link" size="small" class="mt-4" @click="handleShowKernelLogs">
           {{ t('home.overview.viewlog') }}
         </Button>

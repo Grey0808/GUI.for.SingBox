@@ -1,4 +1,15 @@
 export default {
+  customModes: {
+    manage: '管理模式',
+    name: '名称',
+    icon: '图标 / emoji',
+    target: '目标出站',
+    active: '内核实际模式',
+    nextStart: '下次手动启动时的模式',
+    pending: '修改需要在手动启动时应用新配置，不会自动重启。目标出站缺失或不兼容时模式不可用。',
+    rules:
+      'JSON 条件数组：domain, domain_suffix, domain_keyword, domain_regex, ip_cidr, port, network, protocol, process_name, process_path。[] 将所有流量路由到目标。',
+  },
   common: {
     grid: '网格',
     list: '列表',

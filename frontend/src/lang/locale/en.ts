@@ -1,4 +1,16 @@
 export default {
+  customModes: {
+    manage: 'Manage modes',
+    name: 'Name',
+    icon: 'Icon / emoji',
+    target: 'Target outbound',
+    active: 'Actual core mode',
+    nextStart: 'Mode on next explicit start',
+    pending:
+      'Changes require a new configuration on explicit start. No automatic restart. A missing/incompatible target disables the mode.',
+    rules:
+      'JSON conditions array: domain, domain_suffix, domain_keyword, domain_regex, ip_cidr, port, network, protocol, process_name, process_path. [] routes all traffic to the target.',
+  },
   common: {
     grid: 'Grid',
     list: 'List',

@@ -5,6 +5,7 @@ export interface CoreApiConfig {
   'interface-name': string
   'allow-lan': boolean
   mode: string
+  'mode-list'?: string[]
   tun: {
     enable: boolean
     stack: string

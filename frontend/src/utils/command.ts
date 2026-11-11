@@ -11,8 +11,10 @@ import {
   usePluginsStore,
   useRulesetsStore,
   useSubscribesStore,
+  useProfilesStore,
 } from '@/stores'
 import { exitApp, handleChangeMode, message, reloadApp } from '@/utils'
+import { modeKey } from '@/utils/customModes'
 
 type Command = {
   label: string
@@ -93,7 +95,13 @@ export const getCommands = () => {
         {
           label: 'kernel.mode',
           cmd: 'Core Mode',
-          children: ModeOptions.map((mode) => ({
+          children: [
+            ...ModeOptions,
+            ...(useProfilesStore().currentProfile?.customModes || []).map((mode) => ({
+              label: `${mode.icon} ${mode.name}`,
+              value: modeKey(mode),
+            })),
+          ].map((mode) => ({
             label: mode.label,
             cmd: mode.value,
             handler: () => handleChangeMode(mode.value),

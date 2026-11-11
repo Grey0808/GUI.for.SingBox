@@ -24,8 +24,6 @@ import {
 import { DefaultInboundMixed } from '@/constant/profile'
 import { Branch } from '@/enums/app'
 import { Inbound, RulesetType, TunStack } from '@/enums/kernel'
-import { lxCorePath } from '@/utils/coreReleases'
-import { restorePreviousCore } from '@/utils/coreSelection'
 import {
   useAppSettingsStore,
   useProfilesStore,
@@ -48,6 +46,14 @@ import {
   eventBus,
   sleep,
 } from '@/utils'
+import { lxCorePath } from '@/utils/coreReleases'
+import { restorePreviousCore } from '@/utils/coreSelection'
+import {
+  modeKey,
+  modeDefinitionMatches,
+  switchClashMode,
+  type CustomMode,
+} from '@/utils/customModes'
 
 import type { CoreApiConfig, CoreApiProxy } from '@/types/kernel'
 
@@ -86,11 +92,23 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
   })
 
   let runtimeProfile: App.Profile | undefined
+  const modeRuntimeConfig = ref<Record<string, any>>()
+  const modeSwitching = ref(false)
+  const modePending = (mode: CustomMode) =>
+    !config.value['mode-list']?.some((key) => key.toLowerCase() === modeKey(mode).toLowerCase()) ||
+    !modeDefinitionMatches(
+      mode,
+      profilesStore.currentProfile?.outbounds || [],
+      modeRuntimeConfig.value,
+    )
 
   const proxies = ref<Record<string, CoreApiProxy>>({})
 
   const refreshConfig = async () => {
     const _config = await getConfigs()
+    modeRuntimeConfig.value = await ReadFile(CoreConfigFilePath)
+      .then((text) => JSON.parse(text))
+      .catch(() => undefined)
 
     config.value = {
       ..._config,
@@ -113,6 +131,8 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
           }
         })
         runtimeProfile.id = _profile.id
+        runtimeProfile.customModes = _profile.customModes
+        runtimeProfile.selectedMode = _profile.selectedMode
         runtimeProfile.outbounds = _profile.outbounds
         runtimeProfile.experimental = _profile.experimental
         runtimeProfile.dns = _profile.dns
@@ -155,8 +175,37 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
 
   const updateConfig = async (field: string, value: any) => {
     if (field === 'mode') {
-      await setConfigs({ mode: value })
-      await refreshConfig()
+      if (modeSwitching.value) throw Error('A mode switch is already in progress')
+      const profile = profilesStore.currentProfile
+      const custom = profile?.customModes?.find(
+        (mode) => modeKey(mode).toLowerCase() === String(value).toLowerCase(),
+      )
+      if (String(value).toLowerCase().startsWith('custom_') && !custom)
+        throw Error('This custom mode has been removed from the profile')
+      if (custom && modePending(custom))
+        throw Error(
+          'Mode definition is not applied or its target is unavailable. Apply a new configuration explicitly first.',
+        )
+      modeSwitching.value = true
+      try {
+        const actual = await switchClashMode(value, {
+          get: getConfigs,
+          patch: (mode) => setConfigs({ mode }),
+        })
+        await refreshConfig()
+        if (profile) {
+          profile.selectedMode = actual
+          await profilesStore.saveProfiles()
+        }
+        if (runtimeProfile) runtimeProfile.selectedMode = actual
+      } catch (error) {
+        await refreshConfig().catch(() => {
+          config.value.mode = ''
+        })
+        throw error
+      } finally {
+        modeSwitching.value = false
+      }
       return
     }
 
@@ -371,9 +420,10 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
         pluginsStore.onBeforeCoreStartTrigger(config, profile),
       )
       const isAlpha = branch === Branch.Alpha
-      const corePath = branch === Branch.Lx
-        ? lxCorePath(appSettingsStore.app.kernel.lxVersion || '')
-        : CoreWorkingDirectory + '/' + getKernelFileName(isAlpha)
+      const corePath =
+        branch === Branch.Lx
+          ? lxCorePath(appSettingsStore.app.kernel.lxVersion || '')
+          : CoreWorkingDirectory + '/' + getKernelFileName(isAlpha)
       const args = getKernelRuntimeArgs(isAlpha)
       const runIndex = args.indexOf('run')
       if (runIndex === -1) {
@@ -390,6 +440,19 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
       }
       const pid = await runCoreProcess(isAlpha, corePath)
       pid && (await onCoreStarted(pid))
+      if (pid && profile.selectedMode) {
+        const selected = profile.customModes?.find(
+          (m) => modeKey(m).toLowerCase() === profile.selectedMode?.toLowerCase(),
+        )
+        const desired = selected
+          ? modePending(selected)
+            ? 'Rule'
+            : profile.selectedMode
+          : ['rule', 'global', 'direct'].includes(profile.selectedMode.toLowerCase())
+            ? profile.selectedMode
+            : 'Rule'
+        await updateConfig('mode', desired)
+      }
       delete appSettingsStore.app.kernel.previousKernelSelection
     } catch (error) {
       if (!running.value && restorePreviousCore(appSettingsStore.app.kernel)) {
@@ -585,6 +648,8 @@ export const useKernelApiStore = defineStore('kernelApi', () => {
     needRestart,
     coreStateLoading,
     config,
+    modeSwitching,
+    modePending,
     proxies,
     refreshConfig,
     updateConfig,

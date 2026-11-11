@@ -557,6 +557,8 @@ declare namespace App {
   }
 
   interface Profile {
+    customModes?: import('@/utils/customModes').CustomMode[]
+    selectedMode?: string
     id: string
     name: string
     log: Log
