@@ -2,6 +2,8 @@
 
 Implementation includes the Official/LX manager, native Xray URL import, capability-gated XHTTP and custom routing modes. User-facing Windows acceptance remains open: do not use this build to replace a working installation until those scenarios have been verified in a disposable Windows environment.
 
+Use [MANUAL_TESTING.md](../MANUAL_TESTING.md) for the current no-VPN acceptance procedure, expected results and unchecked native scenarios. The [Windows startup audit](windows-startup-audit.md) explains why the native GUI was not started on the active-VPN host. Component tests compile actual Vue SFCs/templates with an inert host and adapted primitive widgets; they do not establish WebView2 layout or native lifecycle behaviour.
+
 Run automated checks from `frontend`:
 
 ```
