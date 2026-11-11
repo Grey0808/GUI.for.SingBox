@@ -34,7 +34,7 @@ test('actual settings store and migration preserve managed/custom selections, pi
   const constants = {
     ...(await execute('../src/constant/app.ts', {
       '@/enums/app': enums,
-      '@/utils': { APP_TITLE: 'GUI.for.SingBox.Custom' },
+      '@/utils': { APP_TITLE: 'GUI.for.SingBox' },
     })),
     UserFilePath: 'fixture/user.yaml',
   }
@@ -111,6 +111,10 @@ test('actual settings store and migration preserve managed/custom selections, pi
     const { useAppSettingsStore } = await execute('../src/stores/appSettings.ts', modules)
     let store = useAppSettingsStore()
     await store.setupAppSettings()
+    assert.ok(
+      store.app.value.plugins.sources.some((source) => source.url.endsWith('/gfs.json?ref=main')),
+    )
+    assert.ok(store.app.value.plugins.sources.every((source) => !source.url.includes('undefined')))
     if (process.env.SING_BOX_TEST_SETTINGS_OUTPUT) {
       const safe = structuredClone(store.app.value)
       Object.assign(safe, {
